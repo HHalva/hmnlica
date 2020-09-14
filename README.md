@@ -1,6 +1,6 @@
 # Hidden Markov Nonlinear ICA: Unsupervised Learning from Nonstationary Time Series.
 
-This repository contains code for our [Hidden Markov Nonlinear ICA model](https://arxiv.org/abs/2006.12107), published at UAI 2020. Work done by Hermanni Hälvä (University of Helsinki) and Aapo Hyvärinen (University of Helsinki)
+This repository contains code for our [Hidden Markov Nonlinear ICA model](https://arxiv.org/abs/2006.12107), published at UAI 2020. Work done by Hermanni Hälvä (University of Helsinki) and Aapo Hyvärinen (University of Helsinki).
 
 ## Dependencies
 
