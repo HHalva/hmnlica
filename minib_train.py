@@ -55,14 +55,14 @@ def train(data_gen_dict, opt_dict, seed_dict,
     decay_steps = opt_dict['decay_steps']
 
     # generate source data
-    s_data, state_seq, mu, D, A = gen_source_data(N, K, T,
-                                                  p_stay,
-                                                  random_seed=data_seed)
+    #s_data, state_seq, mu, D, A = gen_source_data(N, K, T,
+    #                                              p_stay,
+    #                                              random_seed=data_seed)
 
     # mix the sources to create observable signals
-    key = random.PRNGKey(key_mix_mlp)
-    mix_params = init_invertible_mlp_params(key, N, mix_depth)
-    x_data = invertible_mlp_fwd(mix_params, s_data)
+    #key = random.PRNGKey(key_mix_mlp)
+    #mix_params = init_invertible_mlp_params(key, N, mix_depth)
+    #x_data = invertible_mlp_fwd(mix_params, s_data)
 
     # initialize parameters for mlp function approximator
     key = random.PRNGKey(key_est_mlp)
