@@ -3,6 +3,8 @@ import pdb
 import numpy as np
 import scipy as sp
 
+from utils import sample_distant_nsphere_points
+
 
 def gen_source_data(num_comp, num_latent_states, sequence_length,
                     state_stickiness=0.999, radius=2, random_seed=0):
@@ -26,7 +28,7 @@ def gen_source_data(num_comp, num_latent_states, sequence_length,
 
     # create transition matrix
     transition_matrix = np.zeros((num_latent_states,
-                                   num_latent_states))
+                                  num_latent_states))
     for i in range(num_latent_states):
         for j in range(num_latent_states):
             if j == i:
@@ -55,38 +57,14 @@ def gen_source_data(num_comp, num_latent_states, sequence_length,
         state_sequence[i] = np.argmax(m_draw)
 
     # create mean modulation parameters for different latent states
-    # these are created on the circumference of an n-sphere
-    rads = np.zeros((num_latent_states, num_comp-1))
-    for i in range(num_comp-1):
-        if i == num_comp-2:
-            rads[:, i] = np.linspace(0, 2*np.pi, num_latent_states,
-                                     endpoint=False)
-        else:
-            rads[:, i] = np.linspace(0, np.pi, num_latent_states,
-                                     endpoint=False)
-    means = np.zeros((num_latent_states, num_comp))
-    for i in range(num_latent_states):
-        for j in range(num_comp):
-            if j == 0:
-                means[i, j] = radius*np.cos(rads[i, j])
-            elif j == num_comp-1:
-                coord = radius
-                for l in range(j):
-                    coord *= np.sin(rads[i, l])
-                means[i, j] = coord
-            else:
-                coord = radius
-                for k in range(j+1):
-                    if k == j:
-                        coord *= np.cos(rads[i, k])
-                    else:
-                        coord *= np.sin(rads[i, k])
-                means[i, j] = coord
+    # that are sampled far away from each other on an n-sphere
+    means = sample_distant_nsphere_points(num_comp, num_latent_states)
 
     # create variances such that there isnt too much overlap
     # also ensure good condition number
     dists = means.repeat(num_latent_states, 0)-np.tile(
         means, (num_latent_states, 1))
+    pdb.set_trace()
     dists = np.sqrt((dists**2).sum(1))
     min_dist = np.min(dists[dists.nonzero()])
     cond_num_best = 1e+9
