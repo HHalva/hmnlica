@@ -29,7 +29,7 @@ def J_loglikeli_contrib(params, input_data):
 
 
 @jit
-def calc_emission_likelihood(params, input_data, mu_est, D_est):
+def emission_likelihood(params, input_data, mu_est, D_est):
     """Calculate likelihood of the HMM emission distribution for
            each latent state.
 
@@ -65,11 +65,11 @@ def calc_emission_likelihood(params, input_data, mu_est, D_est):
 
 
 @jit
-def mbatch_calc_emission_likelihood(params, input_data, mu_est, D_est):
+def mbatch_emission_likelihood(params, input_data, mu_est, D_est):
     """Calculates emission contribution to data likelihood
         for a mini-batch of sub-sequences.
 
-    This is a minibatch version of 'calc_emission_likelihood' where a minibatch
+    This is a minibatch version of 'emission_likelihood' where a minibatch
     is composed of HMM sub-sequences.
 
     Args:
@@ -87,7 +87,7 @@ def mbatch_calc_emission_likelihood(params, input_data, mu_est, D_est):
             log prob. contribution of the Jacobian term, estimated
             independent components). Each array is in minibatch format.
     """
-    return vmap(calc_emission_likelihood, (None, 0, None, None),
+    return vmap(emission_likelihood, (None, 0, None, None),
                 (0, 0, 0, 0))(params, input_data, mu_est, D_est)
 
 
@@ -212,15 +212,18 @@ def mbatch_m_step(s_est, marg_posteriors, pw_posteriors):
         A_est (array): estimated transition matrix.
         pi_est (array): estimated inital state probabilities.
     """
+    # set dimensions
+    N = s_est.shape[-1]
+    K = marg_posteriors.shape[-1]
     # update mean parameters
     mu_est = (jnp.expand_dims(s_est, -1)
               * jnp.expand_dims(marg_posteriors, -2)).sum((0, 1))
     mu_est /= marg_posteriors.sum((0, 1)).reshape(1, -1)
     mu_est = mu_est.T
 
-    # update covariance matrices for all latent states
+    # update covariance matrices for all latent states and weigh across minib.
     dist_to_mu = s_est[:, jnp.newaxis, :, :]-mu_est[jnp.newaxis, :,
-                                                   jnp.newaxis, :]
+                                                    jnp.newaxis, :]
     cov_est = jnp.einsum('bktn, bktm->bktnm', dist_to_mu, dist_to_mu)
     wgt_cov_est = (cov_est*jnp.transpose(
         marg_posteriors, (0, 2, 1))[:, :, :, jnp.newaxis,
@@ -229,17 +232,81 @@ def mbatch_m_step(s_est, marg_posteriors, pw_posteriors):
                                                       jnp.newaxis]
 
     # set lowerbound to avoid heywood cases
-    eps = 0.01
+    eps = 1e-4
     D_est = jnp.clip(D_est, a_min=eps)
     D_est = D_est*jnp.eye(N).reshape(1, N, N)
 
     # update latent state transitions (notice the prior)
-    hyperobs = 1 #i.e. a-1 ; a=2 where a is hyperprior or dirichlet
+    hyperobs = 1 # i.e. a-1 ; a=2 where a is hyperprior or dirichlet
     expected_counts = pw_posteriors.sum((0, 1))
     A_est = (expected_counts + hyperobs) / (
         K*hyperobs + marg_posteriors.sum((0, 1)).reshape(-1, 1))
 
-    # estimate m_step (with prior)
-    pi_est = marg_posteriors.mean(0)[0] + 1e-4
+    # update initial state probabilities
+    pi_est = marg_posteriors.mean(0)[0] + eps
     pi_est = pi_est/pi_est.sum()
     return mu_est, D_est, A_est, pi_est
+
+
+@jit
+def viterbi_algo(logp_x, transition_matrix, init_probs):
+    """Viterbi algorithm for finding the most likely state path.
+
+    Args:
+        logp_x (array): emission probabilities for observed data
+            conditional on possible latent states.
+        transition_matrix (array): latent state transition matrix.
+        init_probs (array): initial state probabilities.
+
+    Returns:
+        The most likely state path.
+    """
+    # set up T and K
+    T, K = logp_x.shape
+
+    # set up transition parameters
+    A_est_ = transition_matrix
+    pi_est_ = init_probs
+
+    # define forward pass
+    def forward_pass(t, fwd_msgs_and_paths):
+        fwd_msgs, best_paths = fwd_msgs_and_paths
+        msg = logp_x[t]+jnp.max(jnp.log(A_est_)
+                                + fwd_msgs[t-1].reshape(-1, 1), 0)
+        max_prev_state = jnp.argmax(jnp.log(A_est_)
+                                    + fwd_msgs[t-1].reshape(-1, 1), 0)
+        fwd_msgs = ops.index_update(fwd_msgs, ops.index[t, :], msg)
+        best_paths = ops.index_update(best_paths, ops.index[t-1],
+                                      max_prev_state)
+        fwd_msgs_and_paths = (fwd_msgs, best_paths)
+        return fwd_msgs_and_paths
+
+    # initialize forward pass
+    fwd_msgs = jnp.zeros(shape=(T, K), dtype=jnp.float64)
+    best_paths = jnp.zeros(shape=(T, K), dtype=jnp.int64)
+    msg = logp_x[0] + jnp.log(pi_est_)
+    fwd_msgs = ops.index_update(fwd_msgs, 0,
+                                msg)
+    fwd_msgs_and_paths = (fwd_msgs, best_paths)
+
+    # note loop start from 1 since 0 was initialize
+    fwd_msgs, best_paths = lax.fori_loop(1, T, forward_pass,
+                                         fwd_msgs_and_paths)
+
+    # define backward pass
+    def backward_pass(t, the_best_path):
+        best_k = best_paths[-(t+1), the_best_path[-t]]
+        the_best_path = ops.index_update(the_best_path,
+                                         ops.index[-(t+1)], best_k)
+        return the_best_path
+
+    # initialize backward pass
+    the_best_path = jnp.zeros(shape=(T,), dtype=jnp.int64)
+    best_k = jnp.argmax(fwd_msgs[-1])
+    the_best_path = ops.index_update(the_best_path,
+                                     ops.index[-1], best_k)
+
+    # run backward pass
+    the_best_path = lax.fori_loop(1, T, backward_pass,
+                                  the_best_path)
+    return the_best_path

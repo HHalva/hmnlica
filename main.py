@@ -72,7 +72,7 @@ def main():
                                             args.mix_depth)
     x_data = invertible_mlp_fwd(mix_params, s_data)
 
-    # create variable dict for training
+    # create variable dicts for training
     train_dict = {'K': args.k,
                   'mix_depth': args.mix_depth,
                   'hidden_size': args.hidden_units,
@@ -88,7 +88,7 @@ def main():
 
     # train model
     s_est, sort_idx, train_trackers, est_params = train(
-        x_data, train_dict, seed_dict,
+        x_data, state_seq, train_dict, seed_dict,
     )
 
     ## save
