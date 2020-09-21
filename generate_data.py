@@ -75,7 +75,6 @@ def gen_source_data(num_comp, num_latent_states, sequence_length,
             sigmasq_best = sigmasq.copy()
     sigmasq = sigmasq_best
     D = np.zeros(shape=(num_latent_states, num_comp, num_comp))
-    pdb.set_trace()
     for k in range(num_latent_states):
         D[k] = np.diag(sigmasq[k])
 

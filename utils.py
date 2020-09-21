@@ -4,11 +4,14 @@ import scipy as sp
 
 
 def sample_n_sphere(n, k):
-    """ Sample uniformly on n-sphere (Marsaglia method)
+    """ Sample k points uniformly on n-sphere (Marsaglia method).
 
-    Keyword args:
-    n -- number of dimensions (here number of components)
-    k -- number of points on sphere (here latent states)
+    Args:
+        n (int): number of dimensions (here number of components).
+        k (int): number of points on sphere (here latent states).
+
+    Returns:
+        Matrix (k, n) of k sampled points on n-sphere.
     """
     x = np.random.normal(size=(k, n))
     x /= np.linalg.norm(x, 2, axis=1, keepdims=True)
@@ -19,8 +22,11 @@ def dists_on_sphere(x):
     """Calculate sum of squared arc distances
     on an n-sphere for k points.
 
-    Keyword args:
-    x -- matrix (shape (k, n)) of k points on an n-sphere
+    Args:
+        x (matrix): (k, n) matrix of k points on an n-sphere.
+
+    Returns:
+        Distance matrix (k, k) between all the k-points.
     """
     k = x.shape[0]
     dist_mat = np.zeros((k, k))
@@ -34,13 +40,17 @@ def dists_on_sphere(x):
 
 
 def sample_distant_nsphere_points(n, k, iters=100000):
-    """Get maximally distant points on n-sphere when
+    """Get k maximally distant points on n-sphere when
     sampling uniformly repeatedly.
 
-    Keyword args:
-    n -- number of dimensions (here independent components)
-    k -- number of points on sphere (here latent states)
-    iters -- how many rounds to sample (default=10000)
+    Args:
+        n (int): number of dimensions (here independent components).
+        k (int): number of points on sphere (here latent states).
+        iters (int): how many rounds to sample (default=10000).
+
+    Returns:
+        (k, n) matrix of coordinates of maximally mutually distant
+        points.
     """
     best_dist = 0
     for i in range(iters):
@@ -54,28 +64,78 @@ def sample_distant_nsphere_points(n, k, iters=100000):
 
 
 def l2normalize(W, axis=0):
-    """function to normalize MLP weight matrices"""
+    """Normalizes MLP weight matrices.
+
+    Args:
+        W (matrix): weight matrix.
+        axis (int): axis over which to normalize.
+
+    Returns:
+        Matrix l2 normalized over desired axis.
+    """
     l2norm = jnp.sqrt(jnp.sum(W*W, axis, keepdims=True))
     W = W / l2norm
     return W
 
 
-def find_mat_cond_thresh(N, weight_range, iter4condthresh=10000,
+def find_mat_cond_thresh(dim, weight_range, iter4condthresh=10000,
                          cond_thresh_ratio=0.25, random_seed=0):
-    """find condition threshold to ensure invertibility of MLP weights"""
-    random_seed = np.random.seed(random_seed)
+    """Find condition threshold to help ensure invertibility of matrix
 
-    # determine condThresh
+    Empirical estimate of acceptable upper threshold conditioning number.
+    Assumes weights are uniform initialized. Generates large number of matrices
+    and calculates desired percentile of their condition numbers.
+
+    Args:
+        dim (int): dimension of (square) matrix.
+        weight_range (list): list of [lower_bound, upper_bound] for
+            for uniform distribution initializer.
+        iter4condthresh (int): number of iterations to run.
+        cond_thresh_ratio (float): in range 0.0-1.0 to control percentile
+            for what is considered a 'good' conditioning number out of
+            iterations.
+        random_seed (int): numpy random seed.
+
+    Returns:
+        Condition threshold (float)
+    """
+    random_seed = np.random.seed(random_seed)
     cond_list = np.zeros([iter4condthresh])
     for i in range(iter4condthresh):
         W = np.random.uniform(weight_range[0], weight_range[1],
-                              [N, N])
-        #W = np.random.standard_normal((N, N))
-        W = l2normalize(W)
+                              [dim, dim])
+        W = l2normalize(W, 0)
         cond_list[i] = np.linalg.cond(W)
     cond_list.sort()
     cond_thresh = cond_list[int(iter4condthresh*cond_thresh_ratio)]
     return cond_thresh
+
+
+def SmoothLeakyRelu(slope):
+    """Smooth Leaky ReLU activation function.
+
+    Args:
+        slope (float): slope to control degree of non-linearity.
+
+    Returns:
+       Lambda function for computing smooth Leaky ReLU.
+    """
+    return lambda x: smooth_leaky_relu(x, alpha=slope)
+
+
+def smooth_leaky_relu(x, alpha=1.0):
+    """Calculate smooth leaky ReLU on an input.
+
+    Source: https://stats.stackexchange.com/questions/329776/approximating-leaky-relu-with-a-differentiable-function
+
+    Args:
+        x (float): input value.
+        alpha (float): controls level of nonlinearity via slope.
+
+    Returns:
+        Value transformed by the smooth leaky ReLU.
+    """
+    return alpha*x + (1 - alpha)*jnp.logaddexp(x, 0)
 
 
 def matching_sources_corr(est_sources, true_sources, method="pearson"):

@@ -3,11 +3,11 @@ import sys
 import pdb
 import numpy as onp
 from pathlib import Path
-from jax.config import config
+from jax import random
 
 from generate_data import gen_source_data
-#from models import
-#from minib_train import train
+from models import init_invertible_mlp_params, invertible_mlp_fwd
+from minib_train import train
 
 
 def parse():
@@ -27,15 +27,15 @@ def parse():
     # set seeds
     parser.add_argument('--data-seed', type=int, default=0,
                         help="seed for initializing data generation")
-    parser.add_argument('--mix-key', type=int, default=0,
-                        help="jax key for initializing mixing mlp")
-    parser.add_argument('--est-key', type=int, default=1,
-                        help="jax key for initializing function estimator mlp")
+    parser.add_argument('--mix-seed', type=int, default=0,
+                        help="seed for initializing mixing mlp")
+    parser.add_argument('--est-seed', type=int, default=1,
+                        help="seed for initializing function estimator mlp")
     parser.add_argument('--distrib-seed', type=int, default=1,
                         help="seed for estimating distribution paramaters")
     # training & optimization parameters
     parser.add_argument('--hidden-units', type=int, default=100,
-                        help="number of hidden units in function estimator MLP layer")
+                        help="num. of hidden units in function estimator MLP")
     parser.add_argument('--learning-rate', type=float, default=3e-4,
                         help="learning rate for training")
     parser.add_argument('--num-epochs', type=int, default=1000,
@@ -48,11 +48,6 @@ def parse():
                         help="decay rate for training")
     parser.add_argument('--decay-interval', type=int, default=1000,
                         help="interval for full decay of LR")
-    # visualization for !2D! case
-    parser.add_argument('--vis-pre', action='store_true', default=False,
-                        help="visualize distributions pre training")
-    parser.add_argument('--vis-train', action='store_true', default=False,
-                        help="visualize distributions during training")
     # CUDA settings
     parser.add_argument('--cuda', action='store_true', default=True,
                         help="use GPU training")
@@ -72,40 +67,29 @@ def main():
                                                   random_seed=args.data_seed)
 
     # mix the sources to create observable signals
-    #key = random.PRNGKey(args.mix_key)
-    #mix_params = init_invertible_mlp_params(key, args.n, args.mix_depth)
-    #x_data = invertible_mlp_fwd(mix_params, s_data)
+    mix_key = random.PRNGKey(args.mix_seed)
+    mix_params = init_invertible_mlp_params(mix_key, args.n,
+                                            args.mix_depth)
+    x_data = invertible_mlp_fwd(mix_params, s_data)
 
-    pdb.set_trace()
+    # create variable dict for training
+    train_dict = {'K': args.k,
+                  'mix_depth': args.mix_depth,
+                  'hidden_size': args.hidden_units,
+                  'learning_rate': args.learning_rate,
+                  'num_epochs': args.num_epochs,
+                  'subseq_len': args.subseq_len,
+                  'minib_size': args.minibatch_size,
+                  'decay_rate': args.decay_rate,
+                  'decay_steps': args.decay_interval}
 
+    seed_dict = {'est_mlp_seed': args.est_seed,
+                 'est_distrib_seed': args.distrib_seed}
 
-
-    ## set up data generation variables
-    #data_gen_dict = {'N': args.n,
-    #                 'K': args.k,
-    #                 'T': args.t,
-    #                 'p_stay': args.prob_stay,
-    #                 'mix_depth': args.m}
-
-    #seed_dict = {'data_seed': args.dj,
-    #             'key_mix_mlp': args.mk,
-    #             'key_est_mlp': args.ek,
-    #             'seed_est_distrib': args.ps}
-
-    #opt_dict = {'hidden_size': args.hidden_units,
-    #            'learning_rate': args.learning_rate,
-    #            'num_epochs': args.num_epochs,
-    #            'subseq_len': args.sl,
-    #            'minib_size': args.ms,
-    #            'decay_rate': args.decay_rate,
-    #            'decay_steps': args.decay_interval}
-
-    ## train
-    #s_est, sort_idx, train_trackers, true_params, est_params = train(
-    #    data_gen_dict, opt_dict, seed_dict,
-    #    viz_pre=args.vis_pre, viz_train=args.vis_train,
-    #    use_true_mix=args.tm, use_true_distrib=args.td
-    #)
+    # train model
+    s_est, sort_idx, train_trackers, est_params = train(
+        x_data, train_dict, seed_dict,
+    )
 
     ## save
     #Path("output/").mkdir(parents=True, exist_ok=True)
