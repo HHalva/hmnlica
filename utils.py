@@ -139,16 +139,30 @@ def smooth_leaky_relu(x, alpha=1.0):
 
 
 def matching_sources_corr(est_sources, true_sources, method="pearson"):
-    x = np.array(est_sources.copy(), dtype=np.float64)
-    y = np.array(true_sources.copy(), dtype=np.float64)
-    dim = x.shape[1]
+    """Finding matching indices between true and estimated sources.
+
+    Args:
+        est_sources (array): data on estimated independent components.
+        true_sources (array): data on true independent components.
+        method (str): "pearson" or "spearman" correlation method to use.
+
+    Returns:
+        corr_sort_diag (array): pairwise correlation matrix between
+                                matched sources.
+        s_est_sort (array): estimed sources array but columns sorted
+                            according to best matching index.
+        cid (array): vector of the best matching indices.
+    """
+    e_s = np.array(est_sources.copy())
+    s = np.array(true_sources.copy())
+    dim = e_s.shape[1]
 
     # calculate correlations
     if method == "pearson":
-        corr = np.corrcoef(y, x, rowvar=False)
+        corr = np.corrcoef(s, e_s, rowvar=False)
         corr = corr[0:dim, dim:]
     elif method == "spearman":
-        corr, pvals = sp.stats.spearmanr(y, x)
+        corr, pvals = sp.stats.spearmanr(s, e_s)
         corr = corr[0:dim, dim:]
 
     # sort variables to try find matching components
@@ -156,5 +170,5 @@ def matching_sources_corr(est_sources, true_sources, method="pearson"):
 
     # calc with best matching components
     corr_sort_diag = corr[ridx, cidx]
-    x_sort = x[:, cidx]
-    return corr_sort_diag, x_sort, cidx
+    s_est_sort = e_s[:, cidx]
+    return corr_sort_diag, s_est_sort, cidx

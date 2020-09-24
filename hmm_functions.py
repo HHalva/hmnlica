@@ -248,7 +248,7 @@ def mbatch_m_step(s_est, marg_posteriors, pw_posteriors):
     return mu_est, D_est, A_est, pi_est
 
 
-@jit
+#@jit
 def viterbi_algo(logp_x, transition_matrix, init_probs):
     """Viterbi algorithm for finding the most likely state path.
 
@@ -282,8 +282,8 @@ def viterbi_algo(logp_x, transition_matrix, init_probs):
         return fwd_msgs_and_paths
 
     # initialize forward pass
-    fwd_msgs = jnp.zeros(shape=(T, K), dtype=jnp.float64)
-    best_paths = jnp.zeros(shape=(T, K), dtype=jnp.int64)
+    fwd_msgs = jnp.zeros(shape=(T, K))
+    best_paths = jnp.zeros(shape=(T, K), dtype=jnp.int32)
     msg = logp_x[0] + jnp.log(pi_est_)
     fwd_msgs = ops.index_update(fwd_msgs, 0,
                                 msg)
@@ -301,7 +301,7 @@ def viterbi_algo(logp_x, transition_matrix, init_probs):
         return the_best_path
 
     # initialize backward pass
-    the_best_path = jnp.zeros(shape=(T,), dtype=jnp.int64)
+    the_best_path = jnp.zeros(shape=(T,), dtype=jnp.int32)
     best_k = jnp.argmax(fwd_msgs[-1])
     the_best_path = ops.index_update(the_best_path,
                                      ops.index[-1], best_k)

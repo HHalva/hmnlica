@@ -59,7 +59,7 @@ def gen_source_data(num_comp, num_latent_states, sequence_length,
     for i in range(1000):
         # idea that in worst case only 5% of distrib A is under
         # 95% of distrib B and vice versa
-        sigmasq = np.random.uniform(0.01, min_dist/(2*1.65),
+        sigmasq = np.random.uniform(0.001, (min_dist/(2*1.96))**2,
                                     size=(num_latent_states, num_comp))
         # write in natural parameter form
         natural_params_linear = means / sigmasq

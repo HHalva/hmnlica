@@ -14,13 +14,13 @@ def parse():
     parser = argparse.ArgumentParser(description='')
 
     # data generation args
-    parser.add_argument('-n', type=int, default=5,
+    parser.add_argument('-n', type=int, default=2,
                         help="number of latent components")
-    parser.add_argument('-k', type=int, default=11,
+    parser.add_argument('-k', type=int, default=5,
                         help="number of latent states")
     parser.add_argument('-t', type=int, default=100000,
                         help="number of time steps")
-    parser.add_argument('--mix-depth', type=int, default=5,
+    parser.add_argument('--mix-depth', type=int, default=1,
                         help="number of mixing layers")
     parser.add_argument('--prob-stay', type=float, default=0.99,
                         help="probability of staying in a state")
@@ -29,9 +29,9 @@ def parse():
                         help="seed for initializing data generation")
     parser.add_argument('--mix-seed', type=int, default=0,
                         help="seed for initializing mixing mlp")
-    parser.add_argument('--est-seed', type=int, default=1,
+    parser.add_argument('--est-seed', type=int, default=5,
                         help="seed for initializing function estimator mlp")
-    parser.add_argument('--distrib-seed', type=int, default=1,
+    parser.add_argument('--distrib-seed', type=int, default=5,
                         help="seed for estimating distribution paramaters")
     # training & optimization parameters
     parser.add_argument('--hidden-units', type=int, default=100,
@@ -73,8 +73,12 @@ def main():
     x_data = invertible_mlp_fwd(mix_params, s_data)
 
     # create variable dicts for training
-    train_dict = {'K': args.k,
-                  'mix_depth': args.mix_depth,
+    data_dict = {'x_data': x_data,
+                 's_data': s_data,
+                 'state_seq': state_seq}
+
+
+    train_dict = {'mix_depth': args.mix_depth,
                   'hidden_size': args.hidden_units,
                   'learning_rate': args.learning_rate,
                   'num_epochs': args.num_epochs,
@@ -86,9 +90,9 @@ def main():
     seed_dict = {'est_mlp_seed': args.est_seed,
                  'est_distrib_seed': args.distrib_seed}
 
-    # train model
+    # train HM-nICA model
     s_est, sort_idx, train_trackers, est_params = train(
-        x_data, state_seq, train_dict, seed_dict,
+        data_dict, train_dict, seed_dict,
     )
 
     ## save

@@ -16,23 +16,26 @@ from hmm_functions import mbatch_fwd_bwd_algo, mbatch_m_step
 from hmm_functions import forward_backward_algo, viterbi_algo
 from utils import matching_sources_corr
 
+from viz import visualize_init, visualize_train
+
 import pdb
 import time
 
 
 # train HM-nICA
-def train(x, state_seq, train_dict, seed_dict):
+def train(data_dict, train_dict, seed_dict):
     """Train HM-NLICA model using a minibatch implementation of the algorithm
     described in the paper.
 
     Args:
-        x (matrix): data of observed signals over time in (T, N) matrix.
-        state_seq (array): vector containing true state sequence.
+        data_dict (dict.): dictionary of required data in the form of:
+            {'x_data': observed signals (array),
+             's_data': true latent component, for evaluation (array),
+             'state_seq': true latent state sequece (array)}.
         train_dict (dict.): dictionary of variables related to optimization
             of form:
-                {'K': num. of latent states to estimate (int),
-                 'mix_depth': num. layers in mixing/estimator MLP (int), for
-                    example 'mix_depth=1' is linear ICA,
+                {'mix_depth': num. layers in mixing/estimator MLP (int), for
+                    example mix_depth=1 is linear ICA,
                  'hidden_size': num. hidden units per MLP layer (int),
                  'learning_rate': step size for optimizer (float),
                  'num_epochs': num. training epochs (int),
@@ -48,12 +51,17 @@ def train(x, state_seq, train_dict, seed_dict):
     Returns:
         Output description.
     """
+    # unpack data
+    x = data_dict['x_data']
+    s_true = data_dict['s_data']
+    state_seq = data_dict['state_seq']
+
     # set data dimensions
     N = x.shape[1]
     T = x.shape[0]
+    K = len(np.unique(state_seq))
 
     # unpack training variables
-    K = train_dict['K']
     mix_depth = train_dict['mix_depth']
     hidden_size = train_dict['hidden_size']
     learning_rate = train_dict['learning_rate']
@@ -88,6 +96,9 @@ def train(x, state_seq, train_dict, seed_dict):
                                             decay_steps=decay_steps,
                                             decay_rate=decay_rate)
     opt_init, opt_update, get_params = optimizers.adam(schedule)
+
+    s_est_pre = mlp(mlp_params, x)
+    #visualize_init(x, s_true, s_est_pre, state_seq)
 
     # set up loss function and training step
     @jit
@@ -173,10 +184,10 @@ def train(x, state_seq, train_dict, seed_dict):
                 params, batch_data, mu_est, D_est
             )
 
-            print("Avg. lpx_exc_J: {lpx:.2f}\t"
-                  "Avg. lpJ: {lpj:.2f}\t".format(
-                    lpx=logp_x_exc_J.sum((1, 2)).mean(),
-                    lpj=lpj.sum(1).mean()))
+            #print("Avg. lpx_exc_J: {lpx:.2f}\t"
+            #      "Avg. lpJ: {lpj:.2f}\t".format(
+            #        lpx=logp_x_exc_J.sum((1, 2)).mean(),
+            #        lpj=lpj.sum(1).mean()))
 
             # forward-backward algorithm
             marg_posteriors, pw_posteriors, scalers = mbatch_fwd_bwd_algo(
@@ -194,16 +205,16 @@ def train(x, state_seq, train_dict, seed_dict):
                                             num_subseqs)
 
             # calculate approximate (for subseqs) likelihood
-            logl = np.log(scalers).sum(1).mean()
+            #logl = np.log(scalers).sum(1).mean()
             #logl_hist[iter_num] = logl
             #loss_hist[iter_num] = loss
-            print("Epoch: [{0}/{1}]\t"
-                  "Iter: [{2}/{3}]\t"
-                  "Aprox. LogL {logl:.2f}\t"
-                  "Aprox. loss {loss:.2f}".format(
-                      epoch, num_epochs,
-                      batch, num_minibs,
-                      logl=logl, loss=loss))
+            #print("Epoch: [{0}/{1}]\t"
+            #      "Iter: [{2}/{3}]\t"
+            #      "Aprox. LogL {logl:.2f}\t"
+            #      "Aprox. loss {loss:.2f}".format(
+            #          epoch, num_epochs,
+            #          batch, num_minibs,
+            #          logl=logl, loss=loss))
 
         # evaluate on full data at the end of epoch
         params_latest = get_params(opt_state)
@@ -218,33 +229,35 @@ def train(x, state_seq, train_dict, seed_dict):
         # viterbi to estimate state prediction
         est_seq = viterbi_algo(logp_x_all, A_est, pi_est)
         est_seq = np.array(est_seq.copy())
-        match_counts = np.zeros((K, K))
+        match_counts = np.zeros((K, K), dtype=np.int)
+        # algorithm to match estimated and true state indices
         for k in range(K):
             for l in range(K):
-                est_k_idx = (est_seq == k)
-                true_l_idx = (state_seq == l)
+                est_k_idx = (est_seq == k).astype(np.int)
+                true_l_idx = (state_seq == l).astype(np.int)
                 match_counts[k, l] = -np.sum(est_k_idx == true_l_idx)
         _, matchidx = sp.optimize.linear_sum_assignment(match_counts)
+        # relabel est seq with best matching indices
         for t in range(T):
             est_seq[t] = matchidx[est_seq[t]]
-            clustering_acc = np.sum(state_seq == est_seq)/T
-            acc_hist[epoch] = clustering_acc
+        clustering_acc = np.sum(state_seq == est_seq)/T
 
-    #    # evaluate correlation of s_est
-    #    s_corr_diag, s_est_sorted, sort_idx = matching_sources_corr(
-    #        s_est_all, s_data, method="pearson"
-    #    )
-    #    mean_abs_corr = np.mean(np.abs(s_corr_diag))
+        # evaluate correlation of s_est
+        s_corr_diag, s_est_sorted, sort_idx = matching_sources_corr(
+            s_est_all, s_true, method="pearson"
+        )
+        mean_abs_corr = np.mean(np.abs(s_corr_diag))
     #    corr_hist[epoch] = mean_abs_corr
-    #    print("Seeds: {ds}-{km}-{em}-{ps}\t"
-    #          "Epoch: [{0}/{1}]\t"
-    #          "LogL: {logl:.2f}\t"
-    #          "mean corr between s and s_est {corr:.2f}\t"
-    #          "acc {acc:.2f}\t"
-    #          "elapsed {time:.2f}".format(
-    #              epoch, num_epochs, ds=data_seed, km=key_mix_mlp, em=key_est_mlp,
-    #              ps=seed_est_distrib,logl=logl_all, corr=mean_abs_corr,
-    #              acc=clustering_acc, time=time.time()-tic))
+
+        print("Epoch: [{0}/{1}]\t"
+              "LogL: {logl:.2f}\t"
+              "mean corr between s and s_est {corr:.2f}\t"
+              "acc {acc:.2f}\t"
+              "elapsed {time:.2f}".format(
+                  epoch, num_epochs, logl=logl_all, corr=mean_abs_corr,
+                  acc=clustering_acc, time=time.time()-tic))
+
+        #visualize_train(s_true, s_est_all, mu_est, D_est)
 
     ## pack data into tuples
     #est_params = (mu_est, D_est, A_est, est_seq)
