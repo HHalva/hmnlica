@@ -8,6 +8,7 @@ from jax import random
 from generate_data import gen_source_data
 from models import init_invertible_mlp_params, invertible_mlp_fwd
 from minib_train import train
+from utils import pca_whiten
 
 
 def parse():
@@ -24,14 +25,17 @@ def parse():
                         help="number of mixing layers")
     parser.add_argument('--prob-stay', type=float, default=0.99,
                         help="probability of staying in a state")
+    parser.add_argument('--whiten', action='store_true', default=True,
+                        help="PCA whiten data as preprocessing")
+
     # set seeds
     parser.add_argument('--data-seed', type=int, default=0,
                         help="seed for initializing data generation")
     parser.add_argument('--mix-seed', type=int, default=0,
                         help="seed for initializing mixing mlp")
-    parser.add_argument('--est-seed', type=int, default=5,
+    parser.add_argument('--est-seed', type=int, default=6,
                         help="seed for initializing function estimator mlp")
-    parser.add_argument('--distrib-seed', type=int, default=5,
+    parser.add_argument('--distrib-seed', type=int, default=6,
                         help="seed for estimating distribution paramaters")
     # training & optimization parameters
     parser.add_argument('--hidden-units', type=int, default=100,
@@ -71,6 +75,10 @@ def main():
     mix_params = init_invertible_mlp_params(mix_key, args.n,
                                             args.mix_depth)
     x_data = invertible_mlp_fwd(mix_params, s_data)
+
+    # preprocessing
+    if args.whiten:
+        x_data = pca_whiten(x_data)
 
     # create variable dicts for training
     data_dict = {'x_data': x_data,
