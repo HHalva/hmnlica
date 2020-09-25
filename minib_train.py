@@ -15,7 +15,7 @@ from models import init_mlp_params
 from hmm_functions import mbatch_emission_likelihood, emission_likelihood
 from hmm_functions import mbatch_fwd_bwd_algo, mbatch_m_step
 from hmm_functions import forward_backward_algo, viterbi_algo
-from utils import matching_sources_corr
+from utils import matching_sources_corr, clustering_acc
 
 
 # train HM-nICA
@@ -69,6 +69,7 @@ def train(data_dict, train_dict, seed_dict):
 
     print("Training with N={n}, T={t}, K={k}\t"
           "mix_depth={md}".format(n=N, t=T, k=K, md=mix_depth))
+
     # initialize parameters for mlp function approximator
     key = jrandom.PRNGKey(seed_dict['est_mlp_seed'])
     layer_sizes = [N]+[hidden_size]*(mix_depth-1)+[N]
@@ -151,12 +152,6 @@ def train(data_dict, train_dict, seed_dict):
           "num minibatches: {nbs}".format(
               t=T, slen=subseq_len, mbs=minib_size, nbs=num_minibs))
 
-    ## set up trackers
-    #logl_hist = np.zeros(num_epochs*num_minibs)
-    #loss_hist = np.zeros(num_epochs*num_minibs)
-    #acc_hist = np.zeros(num_epochs)
-    #corr_hist = np.zeros(num_epochs)
-
     # initialize and train
     itercount = itertools.count()
     opt_state = opt_init(mlp_params)
@@ -192,7 +187,7 @@ def train(data_dict, train_dict, seed_dict):
                                             marg_posteriors, mu_est, D_est,
                                             opt_state, num_subseqs)
 
-        # evaluate on full data at the end of epoch
+        # gather full data after each epoch for evaluation
         params_latest = get_params(opt_state)
         logp_x_all, _, _, s_est_all = emission_likelihood(
                params_latest, x, mu_est, D_est
@@ -204,26 +199,12 @@ def train(data_dict, train_dict, seed_dict):
 
         # viterbi to estimate state prediction
         est_seq = viterbi_algo(logp_x_all, A_est, pi_est)
-        est_seq = np.array(est_seq.copy())
-        match_counts = np.zeros((K, K), dtype=np.int)
-        # algorithm to match estimated and true state indices
-        for k in range(K):
-            for l in range(K):
-                est_k_idx = (est_seq == k).astype(np.int)
-                true_l_idx = (state_seq == l).astype(np.int)
-                match_counts[k, l] = -np.sum(est_k_idx == true_l_idx)
-        _, matchidx = sp.optimize.linear_sum_assignment(match_counts)
-        # relabel est seq with best matching indices
-        for t in range(T):
-            est_seq[t] = matchidx[est_seq[t]]
-        clustering_acc = np.sum(state_seq == est_seq)/T
+        cluster_acc = clustering_acc(np.array(est_seq), np.array(state_seq))
 
-        # evaluate correlation of s_est
-        s_corr_diag, s_est_sorted, sort_idx = matching_sources_corr(
-            s_est_all, s_true, method="pearson"
+        # evaluate correlation of estimated and true independent components
+        mean_abs_corr, s_est_sorted, sort_idx = matching_sources_corr(
+            np.array(s_est_all), np.array(s_true)
         )
-        mean_abs_corr = np.mean(np.abs(s_corr_diag))
-    #    corr_hist[epoch] = mean_abs_corr
 
         print("Epoch: [{0}/{1}]\t"
               "LogL: {logl:.2f}\t"
@@ -231,7 +212,7 @@ def train(data_dict, train_dict, seed_dict):
               "acc {acc:.2f}\t"
               "elapsed {time:.2f}".format(
                   epoch, num_epochs, logl=logl_all, corr=mean_abs_corr,
-                  acc=clustering_acc, time=time.time()-tic))
+                  acc=cluster_acc, time=time.time()-tic))
 
     ## pack data into tuples
     #est_params = (mu_est, D_est, A_est, est_seq)

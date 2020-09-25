@@ -148,28 +148,69 @@ def matching_sources_corr(est_sources, true_sources, method="pearson"):
         method (str): "pearson" or "spearman" correlation method to use.
 
     Returns:
-        corr_sort_diag (array): pairwise correlation matrix between
-                                matched sources.
+        mean_abs_corr (array): average correlation matrix between
+                               matched sources.
         s_est_sort (array): estimed sources array but columns sorted
                             according to best matching index.
         cid (array): vector of the best matching indices.
     """
-    e_s = np.array(est_sources.copy())
-    s = np.array(true_sources.copy())
-    dim = e_s.shape[1]
+    dim = est_sources.shape[1]
 
     # calculate correlations
     if method == "pearson":
-        corr = np.corrcoef(s, e_s, rowvar=False)
+        corr = np.corrcoef(true_sources, est_sources, rowvar=False)
         corr = corr[0:dim, dim:]
     elif method == "spearman":
-        corr, pvals = sp.stats.spearmanr(s, e_s)
+        corr, pvals = sp.stats.spearmanr(true_sources, est_sources)
         corr = corr[0:dim, dim:]
 
     # sort variables to try find matching components
     ridx, cidx = sp.optimize.linear_sum_assignment(-np.abs(corr))
 
     # calc with best matching components
-    corr_sort_diag = corr[ridx, cidx]
-    s_est_sort = e_s[:, cidx]
-    return corr_sort_diag, s_est_sort, cidx
+    mean_abs_corr = np.mean(np.abs(corr[ridx, cidx]))
+    s_est_sorted = est_sources[:, cidx]
+    return mean_abs_corr, s_est_sorted, cidx
+
+
+def match_state_indices(est_seq, true_seq):
+    """Find best match of estimated and true state labels.
+
+    Args:
+        est_seq (ndarray): estimated latent state sequence.
+        tru_seq (ndarray): true latent state sequence.
+
+    Returns:
+        matchidx (ndarray): best matching true indices for
+            estimated latent state.
+    """
+    K = np.unique(est_seq).shape[0]
+    match_counts = np.zeros((K, K), dtype=np.int)
+    # algorithm to match estimated and true state indices
+    for k in range(K):
+        for l in range(K):
+            est_k_idx = (est_seq == k).astype(np.int)
+            true_l_idx = (true_seq == l).astype(np.int)
+            match_counts[k, l] = -np.sum(est_k_idx == true_l_idx)
+    _, matchidx = sp.optimize.linear_sum_assignment(match_counts)
+    return matchidx
+
+
+def clustering_acc(est_seq, true_seq):
+    """Calculate the accuracy of estimated latent states.
+
+    Note, we use linear sum assignment to match indices of
+    estimated and true states due to label ordering indeterminacy.
+
+    Args:
+        est_seq (ndarray): estimated latent state sequence.
+        tru_seq (ndarray): true latent state sequence.
+
+    Returns:
+        Ratio of time steps at which latent state estimate is correct.
+    """
+    T = len(est_seq)
+    matchidx = match_state_indices(est_seq, true_seq)
+    for t in range(T):
+        est_seq[t] = matchidx[est_seq[t]]
+    return np.sum(est_seq == true_seq)/T
