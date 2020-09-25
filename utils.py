@@ -4,23 +4,6 @@ import numpy as np
 import scipy as sp
 
 
-def pca_whiten(x):
-    """Apply PCA whitening to data.
-
-    Args:
-        x (ndarray): input data.
-
-    Returns:
-        x (ndarray): whitened data.
-    """
-    n = x.shape[1]
-    x = x-np.mean(x, 0, keepdims=True)
-    xcov = np.cov(x.T)
-    d, V = np.linalg.eigh(xcov)
-    pdb.set_trace()
-    return x
-
-
 def sample_n_sphere(n, k):
     """ Sample k points uniformly on n-sphere (Marsaglia method).
 

@@ -32,7 +32,7 @@ def unif_invertible_layer_weights(key, in_dim, out_dim, w_cond_thresh,
     if w_cond_thresh is None:
         W = jrandom.uniform(W_key, (in_dim, out_dim), minval=weight_range[0],
                             maxval=weight_range[1])
-        W = l2normalize(W, 0)
+        W = l2normalize(W, 1)
     else:
         cond_W = w_cond_thresh + 1
         while cond_W > w_cond_thresh:
@@ -40,7 +40,7 @@ def unif_invertible_layer_weights(key, in_dim, out_dim, w_cond_thresh,
             W = jrandom.uniform(subkey, (in_dim, out_dim),
                                 minval=weight_range[0],
                                 maxval=weight_range[1])
-            W = l2normalize(W, 0)
+            W = l2normalize(W, 1)
             cond_W = np.linalg.cond(W)
     b = jrandom.uniform(b_key, (out_dim,), minval=bias_range[0],
                         maxval=bias_range[1])

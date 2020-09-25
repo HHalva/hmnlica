@@ -1,25 +1,21 @@
+import pdb
+import time
+import itertools
+
 import numpy as np
 import scipy as sp
 import jax.numpy as jnp
 import jax.random as jrandom
 
-from jax import grad, value_and_grad, jit, vmap, jacfwd, jacrev
+from jax import value_and_grad, jit
 from jax import lax, ops
-from jax.config import config
 from jax.experimental import optimizers
-from functools import partial
 
-from models import invertible_mlp_inverse, init_mlp_params
-from models import mlp
+from models import init_mlp_params
 from hmm_functions import mbatch_emission_likelihood, emission_likelihood
 from hmm_functions import mbatch_fwd_bwd_algo, mbatch_m_step
 from hmm_functions import forward_backward_algo, viterbi_algo
 from utils import matching_sources_corr
-
-from viz import visualize_init, visualize_train
-
-import pdb
-import time
 
 
 # train HM-nICA
@@ -97,9 +93,6 @@ def train(data_dict, train_dict, seed_dict):
                                             decay_rate=decay_rate)
     opt_init, opt_update, get_params = optimizers.adam(schedule)
 
-    s_est_pre = mlp(mlp_params, x)
-    #visualize_init(x, s_true, s_est_pre, state_seq)
-
     # set up loss function and training step
     @jit
     def calc_loss(params, input_data, marginal_posteriors,
@@ -137,6 +130,8 @@ def train(data_dict, train_dict, seed_dict):
         subseq_len = subseq_data.shape[1]
 
         def body_fun(i, subseq_data):
+            """Function to loop over.
+            """
             subseq_i = lax.dynamic_slice_in_dim(orig_data, i, subseq_len)
             subseq_data = ops.index_update(subseq_data, ops.index[i, :, :],
                                            subseq_i)
@@ -163,6 +158,7 @@ def train(data_dict, train_dict, seed_dict):
     #corr_hist = np.zeros(num_epochs)
 
     # initialize and train
+    itercount = itertools.count()
     opt_state = opt_init(mlp_params)
     all_subseqs_idx = np.arange(num_subseqs)
     for epoch in range(num_epochs):
@@ -172,9 +168,6 @@ def train(data_dict, train_dict, seed_dict):
         sub_data = sub_data.copy()[all_subseqs_idx]
         # train over minibatches
         for batch in range(num_minibs):
-            # keep track of total iteration number
-            iter_num = batch + epoch*num_minibs
-
             # select sub-sequence for current minibatch
             batch_data = sub_data[batch*minib_size:(batch+1)*minib_size]
 
@@ -200,10 +193,9 @@ def train(data_dict, train_dict, seed_dict):
                                                          pw_posteriors)
 
             # SGD for mlp parameters
-            loss, opt_state = training_step(iter_num, batch_data, marg_posteriors,
-                                            mu_est, D_est, opt_state,
-                                            num_subseqs)
-
+            loss, opt_state = training_step(next(itercount), batch_data,
+                                            marg_posteriors, mu_est, D_est,
+                                            opt_state, num_subseqs)
             # calculate approximate (for subseqs) likelihood
             #logl = np.log(scalers).sum(1).mean()
             #logl_hist[iter_num] = logl
@@ -256,8 +248,6 @@ def train(data_dict, train_dict, seed_dict):
               "elapsed {time:.2f}".format(
                   epoch, num_epochs, logl=logl_all, corr=mean_abs_corr,
                   acc=clustering_acc, time=time.time()-tic))
-
-        #visualize_train(s_true, s_est_all, mu_est, D_est)
 
     ## pack data into tuples
     #est_params = (mu_est, D_est, A_est, est_seq)

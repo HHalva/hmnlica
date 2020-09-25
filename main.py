@@ -1,23 +1,25 @@
+import pdb
+
 import argparse
 import sys
-import pdb
-import numpy as onp
+
 from pathlib import Path
 from jax import random
+from sklearn.decomposition import PCA
+
 
 from generate_data import gen_source_data
 from models import init_invertible_mlp_params, invertible_mlp_fwd
 from minib_train import train
-from utils import pca_whiten
 
 
 def parse():
     parser = argparse.ArgumentParser(description='')
 
     # data generation args
-    parser.add_argument('-n', type=int, default=2,
+    parser.add_argument('-n', type=int, default=5,
                         help="number of latent components")
-    parser.add_argument('-k', type=int, default=5,
+    parser.add_argument('-k', type=int, default=11,
                         help="number of latent states")
     parser.add_argument('-t', type=int, default=100000,
                         help="number of time steps")
@@ -33,12 +35,12 @@ def parse():
                         help="seed for initializing data generation")
     parser.add_argument('--mix-seed', type=int, default=0,
                         help="seed for initializing mixing mlp")
-    parser.add_argument('--est-seed', type=int, default=6,
+    parser.add_argument('--est-seed', type=int, default=7,
                         help="seed for initializing function estimator mlp")
-    parser.add_argument('--distrib-seed', type=int, default=6,
+    parser.add_argument('--distrib-seed', type=int, default=7,
                         help="seed for estimating distribution paramaters")
     # training & optimization parameters
-    parser.add_argument('--hidden-units', type=int, default=100,
+    parser.add_argument('--hidden-units', type=int, default=10,
                         help="num. of hidden units in function estimator MLP")
     parser.add_argument('--learning-rate', type=float, default=3e-4,
                         help="learning rate for training")
@@ -49,9 +51,9 @@ def parse():
     parser.add_argument('--minibatch-size', type=int, default=64,
                         help="number of subsequences in a minibatch")
     parser.add_argument('--decay-rate', type=float, default=1.,
-                        help="decay rate for training")
-    parser.add_argument('--decay-interval', type=int, default=1000,
-                        help="interval for full decay of LR")
+                        help="decay rate for training (default to no decay)")
+    parser.add_argument('--decay-interval', type=int, default=15000,
+                        help="interval (in iterations) for full decay of LR")
     # CUDA settings
     parser.add_argument('--cuda', action='store_true', default=True,
                         help="use GPU training")
@@ -78,13 +80,13 @@ def main():
 
     # preprocessing
     if args.whiten:
-        x_data = pca_whiten(x_data)
+        pca = PCA(whiten=True)
+        x_data = pca.fit_transform(x_data)
 
     # create variable dicts for training
     data_dict = {'x_data': x_data,
                  's_data': s_data,
                  'state_seq': state_seq}
-
 
     train_dict = {'mix_depth': args.mix_depth,
                   'hidden_size': args.hidden_units,
