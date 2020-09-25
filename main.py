@@ -100,9 +100,20 @@ def main():
     seed_dict = {'est_mlp_seed': args.est_seed,
                  'est_distrib_seed': args.distrib_seed}
 
+    # set up dict to save results
+    results_dict = {}
+    results_dict['data_config'] = {'N': args.n, 'K': args.k, 'T': args.t,
+                                   'mix_depth': args.mix_depth,
+                                   'p_stay': args.prob_stay,
+                                   'data_seed': args.data_seed,
+                                   'mix_seed': args.mix_seed}
+    results_dict['train_config'] = {'train_vars': train_dict,
+                                    'train_seeds': seed_dict}
+    results_dict['results'] = []
+
     # train HM-nICA model
     s_est, sort_idx, train_trackers, est_params = train(
-        data_dict, train_dict, seed_dict,
+        data_dict, train_dict, seed_dict, results_dict
     )
 
     ## save

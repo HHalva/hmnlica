@@ -19,7 +19,7 @@ from utils import matching_sources_corr, clustering_acc
 
 
 # train HM-nICA
-def train(data_dict, train_dict, seed_dict):
+def train(data_dict, train_dict, seed_dict, results_dict):
     """Train HM-NLICA model using a minibatch implementation of the algorithm
     described in the paper.
 
@@ -43,6 +43,7 @@ def train(data_dict, train_dict, seed_dict):
             of form:
                 {'est_mlp_seed': seed to initialize MLP parameters (int),
                  'est_distrib_seed': seed to initialize exp fam params (int)}.
+        results_dict (dict.): stores data to save (see main.py).
 
     Returns:
         Output description.
@@ -206,6 +207,14 @@ def train(data_dict, train_dict, seed_dict):
             np.array(s_est_all), np.array(s_true)
         )
 
+        # save results
+        results_dict['results'].append({'epoch': epoch,
+                                        'logl': logl_all,
+                                        'corr': mean_abs_corr,
+                                        'acc': cluster_acc})
+        if epoch == 2:
+            pdb.set_trace()
+        # print them
         print("Epoch: [{0}/{1}]\t"
               "LogL: {logl:.2f}\t"
               "mean corr between s and s_est {corr:.2f}\t"
