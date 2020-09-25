@@ -177,11 +177,6 @@ def train(data_dict, train_dict, seed_dict):
                 params, batch_data, mu_est, D_est
             )
 
-            #print("Avg. lpx_exc_J: {lpx:.2f}\t"
-            #      "Avg. lpJ: {lpj:.2f}\t".format(
-            #        lpx=logp_x_exc_J.sum((1, 2)).mean(),
-            #        lpj=lpj.sum(1).mean()))
-
             # forward-backward algorithm
             marg_posteriors, pw_posteriors, scalers = mbatch_fwd_bwd_algo(
                 logp_x, A_est, pi_est
@@ -196,17 +191,6 @@ def train(data_dict, train_dict, seed_dict):
             loss, opt_state = training_step(next(itercount), batch_data,
                                             marg_posteriors, mu_est, D_est,
                                             opt_state, num_subseqs)
-            # calculate approximate (for subseqs) likelihood
-            #logl = np.log(scalers).sum(1).mean()
-            #logl_hist[iter_num] = logl
-            #loss_hist[iter_num] = loss
-            #print("Epoch: [{0}/{1}]\t"
-            #      "Iter: [{2}/{3}]\t"
-            #      "Aprox. LogL {logl:.2f}\t"
-            #      "Aprox. loss {loss:.2f}".format(
-            #          epoch, num_epochs,
-            #          batch, num_minibs,
-            #          logl=logl, loss=loss))
 
         # evaluate on full data at the end of epoch
         params_latest = get_params(opt_state)
