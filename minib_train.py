@@ -154,6 +154,7 @@ def train(data_dict, train_dict, seed_dict, results_dict):
               t=T, slen=subseq_len, mbs=minib_size, nbs=num_minibs))
 
     # initialize and train
+    best_logl = -np.inf
     itercount = itertools.count()
     opt_state = opt_init(mlp_params)
     all_subseqs_idx = np.arange(num_subseqs)
@@ -208,12 +209,18 @@ def train(data_dict, train_dict, seed_dict, results_dict):
         )
 
         # save results
+        if logl_all > best_logl:
+            best_logl = logl_all
+            best_logl_corr = mean_abs_corr
+            best_logl_acc = cluster_acc
+            results_dict['results'].append({'best_logl': best_logl,
+                                            'best_logl_corr': mean_abs_corr,
+                                            'best_logl_acc': cluster_acc})
+
         results_dict['results'].append({'epoch': epoch,
                                         'logl': logl_all,
                                         'corr': mean_abs_corr,
                                         'acc': cluster_acc})
-        if epoch == 2:
-            pdb.set_trace()
         # print them
         print("Epoch: [{0}/{1}]\t"
               "LogL: {logl:.2f}\t"
@@ -223,7 +230,9 @@ def train(data_dict, train_dict, seed_dict, results_dict):
                   epoch, num_epochs, logl=logl_all, corr=mean_abs_corr,
                   acc=cluster_acc, time=time.time()-tic))
 
-    ## pack data into tuples
-    #est_params = (mu_est, D_est, A_est, est_seq)
-    #train_trackers = (logl_hist, corr_hist, acc_hist)
-    #return s_est, sort_idx, train_trackers, est_params
+    # pack data into tuples
+    results_dict['results'].append({'best_logl': best_logl,
+                                    'best_logl_corr': best_logl_corr,
+                                    'best_logl_acc': best_logl_acc})
+    est_params = (mu_est, D_est, A_est, est_seq)
+    return s_est, sort_idx, results_dict, est_params
