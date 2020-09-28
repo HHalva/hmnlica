@@ -12,7 +12,7 @@ from sklearn.decomposition import PCA
 
 from generate_data import gen_source_data
 from models import init_invertible_mlp_params, invertible_mlp_fwd
-from minib_train import train
+from train import train
 
 
 def parse():

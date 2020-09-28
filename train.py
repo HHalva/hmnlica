@@ -3,7 +3,6 @@ import time
 import itertools
 
 import numpy as np
-import scipy as sp
 import jax.numpy as jnp
 import jax.random as jrandom
 
@@ -46,7 +45,10 @@ def train(data_dict, train_dict, seed_dict, results_dict):
         results_dict (dict.): stores data to save (see main.py).
 
     Returns:
-        Output description.
+        s_est (array): estimated independent components.
+        sort_idx (array): best matching indices of components to true indices.
+        results_dict (dict): to save all evaluation and training results.
+        est_params (list): list of all estimated parameter arrays.
     """
     # unpack data
     x = data_dict['x_data']
