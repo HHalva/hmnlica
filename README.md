@@ -3,7 +3,14 @@
 This repository contains code for our [Hidden Markov Nonlinear ICA model](https://arxiv.org/abs/2006.12107), published at UAI 2020. Work done by Hermanni Hälvä (University of Helsinki) and Aapo Hyvärinen (University of Helsinki).
 
 ## Dependencies
-
+We have tested the code on:
+Python 3.7.5
+JAX 0.1.55
+jaxlib 0.1.37
+numpy 1.17.4
+scipy 1.3.2
+scikit-learn 0.21.3
+pickle 4.0
 
 ## References
 
