@@ -1,5 +1,3 @@
-import pdb
-
 import os
 import argparse
 import sys
@@ -16,6 +14,8 @@ from train import train
 
 
 def parse():
+    """Argument parser for all configs.
+    """
     parser = argparse.ArgumentParser(description='')
 
     # data generation args
@@ -37,9 +37,9 @@ def parse():
                         help="seed for initializing data generation")
     parser.add_argument('--mix-seed', type=int, default=0,
                         help="seed for initializing mixing mlp")
-    parser.add_argument('--est-seed', type=int, default=8,
+    parser.add_argument('--est-seed', type=int, default=7,
                         help="seed for initializing function estimator mlp")
-    parser.add_argument('--distrib-seed', type=int, default=8,
+    parser.add_argument('--distrib-seed', type=int, default=7,
                         help="seed for estimating distribution paramaters")
     # training & optimization parameters
     parser.add_argument('--hidden-units', type=int, default=10,
