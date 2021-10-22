@@ -1,6 +1,6 @@
 # Hidden Markov Nonlinear ICA: Unsupervised Learning from Nonstationary Time Series.
 
-This repository contains code for our [Hidden Markov Nonlinear ICA model](https://arxiv.org/abs/2006.12107), published at UAI 2020. Work done by **Hermanni Hälvä** (University of Helsinki) and **Aapo Hyvärinen** (University of Helsinki). The algorithm here is the stochastic subchain sampling approach discussed in Section 3.3. of our paper, which corresponds to minibatch training of the HMM.
+This repository contains code for our [Hidden Markov Nonlinear ICA model](https://arxiv.org/abs/2006.12107), published at UAI 2020. Work done by **Hermanni Hälvä** (University of Helsinki) and **Aapo Hyvärinen** (University of Helsinki). The algorithm here is the stochastic subchain sampling approach discussed in Section 3.3. of our paper, which corresponds to minibatch training of the HMM. The results in the paper were obtained by starting each run from 20 different parameter initialization and choosing one which reached highest likelihood. This was done using parallel computation our SLURM serverss so the code for that is not provided here. Running the code from multiple initialization is nevertheless recommended as it helps to avoid poor local optima.
 
 ## Dependencies
 We have tested the code on:
